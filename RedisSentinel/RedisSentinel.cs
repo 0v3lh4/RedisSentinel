@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace RedisSentinel
@@ -13,18 +14,67 @@ namespace RedisSentinel
     {
         const string DEFAULT_MASTER_NAME = "mymaster";
         const int DEFAULT_PORT = 26379;
+        const int DEFAULT_BUFFER_SIZE = 1024;
         Socket _socket;
 
         internal EndPoint[] SentinelsEndpoint { get; private set; }
 
-        private RedisSentinel(EndPoint endpoint, string masterName = null)
+        internal string MasterName { get; set; }
+
+        /// <summary>
+        /// Default value 1000 milliseconds
+        /// </summary>
+        public int SentinelConnectTimeoutMs { get; set; }
+
+        public RedisSentinel(IEnumerable<string> hosts, string masterName = null)
         {
-            SentinelInitialize(endpoint, masterName);
+            SetSentinelsEndpoint(hosts);
+            SentinelInitialize(masterName);
         }
 
         public RedisSentinel(string host, int port, string masterName = null)
         {
-            SentinelInitialize(CreateEndPoint(host, port), masterName);
+            SetSentinelsEndpoint(CreateEndPoint(host, port));
+            SentinelInitialize(masterName);
+        }
+
+        public List<Tuple<string, int>> GetMasters()
+        {
+
+        }
+
+        public byte[] SendCommand(byte[] command)
+        {
+            Start();
+
+            var receivedData = new byte[DEFAULT_BUFFER_SIZE];
+            int bytesRead = 0;
+            int bytesReadAux = 0;
+            byte[] bytes = null;
+
+            if (_socket.Connected)
+            {
+                _socket.Send(command, command.Length, SocketFlags.None);
+
+                do
+                {
+                    bytesRead = _socket.Receive(receivedData, receivedData.Length, SocketFlags.None);
+
+                    if (bytes == null)
+                    {
+                        bytes = new byte[_socket.Available + bytesRead];
+                    }
+
+                    Buffer.BlockCopy(receivedData, 0, bytes, bytesReadAux, bytesRead);
+
+                    bytesReadAux = bytesRead;
+                }
+                while (_socket.Available > bytesRead);
+            }
+
+            Dispose();
+
+            return bytes;
         }
 
         private EndPoint CreateEndPoint(string host, int port)
@@ -32,32 +82,15 @@ namespace RedisSentinel
             return new DnsEndPoint(host, port);
         }
 
-        public RedisSentinel(IEnumerable<string> hosts, string masterName = null)
+        private void SentinelInitialize(string masterName = null)
         {
-            SetSentinelsEndpoint(hosts);
-
-            for (int i = 0; i < SentinelsEndpoint.Count(); i++)
-            {
-                var endpoint = SentinelsEndpoint[0];
-
-                try
-                {
-                    SentinelInitialize(endpoint, masterName);
-                    break;
-                }
-                catch (SentinelConnectionTimeoutException)
-                {
-                    continue;
-                }
-            }
-
-            if (_socket == null)
-                throw new SentinelsTimeoutException("All setinels are down");
+            SentinelConnectTimeoutMs = 1000;
+            MasterName = masterName;
         }
 
-        private void SentinelInitialize(EndPoint endpoint, string masterName = null)
+        private void SetSentinelsEndpoint(EndPoint endpoint)
         {
-            Connect(endpoint);
+            SentinelsEndpoint = new EndPoint[] { endpoint };
         }
 
         private void SetSentinelsEndpoint(IEnumerable<string> hosts)
@@ -82,19 +115,35 @@ namespace RedisSentinel
             return CreateEndPoint(parts[0], Convert.ToInt32(parts[1]));
         }
 
-        //public byte[] SendCommand()
-        //{
+        private void Start()
+        {
+            for (int i = 0; i < SentinelsEndpoint.Count(); i++)
+            {
+                var endpoint = SentinelsEndpoint[i];
 
-        //}
+                try
+                {
+                    Connect(endpoint);
+                    break;
+                }
+                catch (SentinelConnectionTimeoutException)
+                {
+                    continue;
+                }
+            }
+
+            if (_socket == null)
+                throw new SentinelConnectionTimeoutException("All setinels are down");
+        }
 
         private void Connect(EndPoint sentinelEndPoint)
         {
             _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
             var asyncResult = _socket.BeginConnect(sentinelEndPoint, null, null);
-            var success = asyncResult.AsyncWaitHandle.WaitOne(10000, true);
+            var success = asyncResult.AsyncWaitHandle.WaitOne(SentinelConnectTimeoutMs, true);
 
-            if(!success || !_socket.Connected)
+            if (!success || !_socket.Connected)
             {
                 Dispose();
                 asyncResult = null;

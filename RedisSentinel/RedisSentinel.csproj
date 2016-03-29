@@ -43,11 +43,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Commands.cs" />
     <Compile Include="Exceptions\SentinelConnectionTimeoutException.cs" />
-    <Compile Include="Exceptions\SentinelsTimeoutException.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RedisSentinel.cs" />
+    <Compile Include="RespReader.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
