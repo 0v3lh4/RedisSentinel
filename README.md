@@ -1,0 +1,2 @@
+# RedisSentinel
+Redis sentinel client
