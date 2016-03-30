@@ -19,12 +19,19 @@ namespace RedisSentinel
 
         internal EndPoint[] SentinelsEndpoint { get; private set; }
 
-        internal string MasterName { get; set; }
+        internal string MasterName { get; private set; }
+
+        internal int SockectSendAttemps { get; private set; }
 
         /// <summary>
         /// Default value 1000 milliseconds
         /// </summary>
         public int SentinelConnectTimeoutMs { get; set; }
+
+        /// <summary>
+        /// Default value 3
+        /// </summary>
+        public int SentinelSendAttemps { get; set; }
 
         public RedisSentinel(IEnumerable<string> hosts, string masterName = null)
         {
@@ -38,12 +45,174 @@ namespace RedisSentinel
             SentinelInitialize(masterName);
         }
 
-        public List<Tuple<string, int>> GetMasters()
+        public List<SentinelMaster> GetMasters()
         {
+            List<SentinelMaster> masters = new List<SentinelMaster>();
+            var responseCommand = RespReader.Factory.Return(SendCommand(Commands.MASTER()));
 
+            validResponse(responseCommand);
+
+            foreach (var obj in (object[])responseCommand)
+            {
+                var fields = (object[])obj;
+                var master = new SentinelMaster();
+
+                for (int i = 0; i < fields.Count(); i += 2)
+                {
+                    var key = fields[i].ToString();
+                    var value = fields[i + 1];
+
+                    SetFieldMaster(key, value, master);
+                }
+
+                masters.Add(master);
+            }
+
+            return masters;
         }
 
-        public byte[] SendCommand(byte[] command)
+        public List<SentinelSlave> GetSlaves(string masterName = null)
+        {
+            List<SentinelSlave> masters = new List<SentinelSlave>();
+            var responseCommand = RespReader.Factory.Return(SendCommand(Commands.SLAVE(masterName ?? DEFAULT_MASTER_NAME)));
+
+            validResponse(responseCommand);
+
+            foreach (var obj in (object[])responseCommand)
+            {
+                var fields = (object[])obj;
+                var slave = new SentinelSlave();
+
+                for (int i = 0; i < fields.Count(); i += 2)
+                {
+                    var key = fields[i].ToString();
+                    var value = fields[i + 1];
+
+                    SetFieldSlave(key, value, slave);
+                }
+
+                masters.Add(slave);
+            }
+
+            return masters;
+        }
+
+        private void validResponse(object responseCommand)
+        {
+            if(responseCommand is string && responseCommand.ToString().Contains("ERR"))
+            {
+                throw new SentinelException(responseCommand.ToString().Replace("ERR", ""));
+            }
+        }
+
+        private void SetFieldSlave(string key, object value, SentinelSlave slaveObj)
+        {
+            SetFieldSentinelObjectBase(key, value, slaveObj);
+
+            switch (key)
+            {
+                case SentinelSlave.SENTINEL_KEYS_MASTER_LINK_DOWN_TIME:
+                    slaveObj.MasterLinkDowntime = Convert.ToInt32(value);
+                    break;
+                case SentinelSlave.SENTINEL_KEYS_MASTER_LINK_STATUS:
+                    slaveObj.MasterLinkStatus = (SentinelSlave.MasterLinkStatusType)Enum.Parse(
+                        typeof(SentinelSlave.MasterLinkStatusType),
+                        value.ToString());
+                    break;
+                case SentinelSlave.SENTINEL_KEYS_MASTER_HOST:
+                    slaveObj.MasterHost = value.ToString();
+                    break;
+                case SentinelSlave.SENTINEL_KEYS_MASTER_PORT:
+                    slaveObj.MasterPort = Convert.ToInt32(value);
+                    break;
+                case SentinelSlave.SENTINEL_KEYS_SLAVE_PRIORITY:
+                    slaveObj.SlavePriority = Convert.ToInt32(value);
+                    break;
+                case SentinelSlave.SENTINEL_KEYS_SLAVE_REPL_OFFSET:
+                    slaveObj.SlaveReplOffset = Convert.ToInt32(value);
+                    break;
+           }
+        }
+
+
+        private void SetFieldMaster(string key, object value, SentinelMaster masterObj)
+        {
+            SetFieldSentinelObjectBase(key, value, masterObj);
+
+            switch (key)
+            {
+                case SentinelMaster.SENTINEL_KEYS_CONFIG_EPOCH:
+                    masterObj.ConfigEpoch = Convert.ToInt32(value);
+                    break;
+                case SentinelMaster.SENTINEL_KEYS_NUM_SLAVES:
+                    masterObj.SlavesCount = Convert.ToInt32(value);
+                    break;
+                case SentinelMaster.SENTINEL_KEYS_NUM_OTHER_SENTINELS:
+                    masterObj.SentinelsCount = Convert.ToInt32(value);
+                    break;
+                case SentinelMaster.SENTINEL_KEYS_QUORUM:
+                    masterObj.SentinelQuorum = Convert.ToInt32(value);
+                    break;
+                case SentinelMaster.SENTINEL_KEYS_FAILOVER_TIMEOUT:
+                    masterObj.FailoverTimeout = Convert.ToInt32(value);
+                    break;
+                case SentinelMaster.SENTINEL_KEYS_PARALLEL_SYNCS:
+                    masterObj.ParallelSyncs = Convert.ToInt32(value);
+                    break;
+            }
+        }
+
+        private void SetFieldSentinelObjectBase(string key, object value, SentinelObjectBase obj)
+        {
+            switch (key)
+            {
+                case SentinelObjectBase.SENTINEL_KEYS_NAME:
+                    obj.Name = value.ToString();
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_IP:
+                    obj.Host = value.ToString();
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_PORT:
+                    obj.Port = Convert.ToInt32(value);
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_DOWN_AFTER_MILLISECONDS:
+                    obj.DownAfterMilliseconds = Convert.ToInt32(value);
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_FLAGS:
+                    obj.Flags = (SentinelObjectBase.FlagsType)Enum.Parse(
+                        typeof(SentinelObjectBase.FlagsType),
+                        value.ToString());
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_INFO_REFRESH:
+                    obj.InfoRefresh = Convert.ToInt32(value);
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_LAST_OK_PING_REPLY:
+                    obj.LastOkPingReply = Convert.ToInt32(value);
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_LAST_PING_REPLY:
+                    obj.LastPingReply = Convert.ToInt32(value);
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_LAST_PING_SENT:
+                    obj.LastPingSent = Convert.ToInt32(value);
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_PENDING_COMMANDS:
+                    obj.PendingCommands = Convert.ToInt32(value);
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_ROLE_REPORTED:
+                    obj.RoleReported = (SentinelObjectBase.RoleReportedType)Enum.Parse(
+                        typeof(SentinelObjectBase.RoleReportedType),
+                        value.ToString());
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_ROLE_REPORTED_TIME:
+                    obj.RoleReportedTime = Convert.ToInt32(value);
+                    break;
+                case SentinelObjectBase.SENTINEL_KEYS_RUNID:
+                    obj.RunId = value.ToString();
+                    break;
+            }
+        }
+
+        internal byte[] SendCommand(byte[] command)
         {
             Start();
 
@@ -54,22 +223,37 @@ namespace RedisSentinel
 
             if (_socket.Connected)
             {
-                _socket.Send(command, command.Length, SocketFlags.None);
-
-                do
+                try
                 {
-                    bytesRead = _socket.Receive(receivedData, receivedData.Length, SocketFlags.None);
+                    _socket.Send(command, command.Length, SocketFlags.None);
 
-                    if (bytes == null)
+                    while (_socket.Available > 0)
                     {
-                        bytes = new byte[_socket.Available + bytesRead];
+                        bytesRead = _socket.Receive(receivedData, receivedData.Length, SocketFlags.None);
+
+                        if (bytes == null)
+                        {
+                            bytes = new byte[_socket.Available + bytesRead];
+                        }
+
+                        Buffer.BlockCopy(receivedData, 0, bytes, bytesReadAux, bytesRead);
+
+                        bytesReadAux += bytesRead;
                     }
-
-                    Buffer.BlockCopy(receivedData, 0, bytes, bytesReadAux, bytesRead);
-
-                    bytesReadAux = bytesRead;
                 }
-                while (_socket.Available > bytesRead);
+                catch (SocketException ex)
+                {
+                    if (SockectSendAttemps < SentinelSendAttemps)
+                    {
+                        Dispose();
+
+                        SockectSendAttemps++;
+                        return SendCommand(command);
+                    } else
+                    {
+                        throw new SentinelException(ex.Message, ex);
+                    }
+                }
             }
 
             Dispose();
@@ -85,6 +269,7 @@ namespace RedisSentinel
         private void SentinelInitialize(string masterName = null)
         {
             SentinelConnectTimeoutMs = 1000;
+            SentinelSendAttemps = 3;
             MasterName = masterName;
         }
 

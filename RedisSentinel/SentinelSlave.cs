@@ -1,0 +1,31 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace RedisSentinel
+{
+    public class SentinelSlave : SentinelObjectBase
+    {
+        public const string SENTINEL_KEYS_MASTER_LINK_DOWN_TIME = "master-link-down_time";
+        public const string SENTINEL_KEYS_MASTER_LINK_STATUS = "master-link-status";
+        public const string SENTINEL_KEYS_MASTER_HOST = "master-host";
+        public const string SENTINEL_KEYS_MASTER_PORT = "master-port";
+        public const string SENTINEL_KEYS_SLAVE_PRIORITY = "slave-priority";
+        public const string SENTINEL_KEYS_SLAVE_REPL_OFFSET = "slave-repl-offset";
+
+        public enum MasterLinkStatusType
+        {
+            ok,
+            err
+        }
+
+        public int MasterLinkDowntime { get; set; }
+        public MasterLinkStatusType MasterLinkStatus { get; set; }
+        public string MasterHost { get; set; }
+        public int MasterPort { get; set; }
+        public int SlavePriority { get; set; }
+        public int SlaveReplOffset { get; set; }
+    }
+}

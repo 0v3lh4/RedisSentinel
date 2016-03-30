@@ -16,10 +16,9 @@ namespace RedisSentinel
         {
             return GenerateCommand("SENTINEL", "MASTERS");
         }
-
-        public static byte[] TESTE()
+        public static byte[] SLAVE(string masterName)
         {
-            return GenerateCommand("GET", "teste");
+            return GenerateCommand("SENTINEL", "SLAVES", masterName);
         }
 
         private static byte[] GenerateCommand(params string[] commands)

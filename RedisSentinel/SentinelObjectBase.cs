@@ -10,18 +10,32 @@ namespace RedisSentinel
     {
         public enum FlagsType
         {
-            Master,
-            Slave
+            master,
+            slave
         }
         public enum RoleReportedType
         {
-            Master,
-            Slave
+            master,
+            slave
         }
+
+        public const string SENTINEL_KEYS_NAME = "name";
+        public const string SENTINEL_KEYS_IP = "ip";
+        public const string SENTINEL_KEYS_PORT = "port";
+        public const string SENTINEL_KEYS_RUNID = "runid";
+        public const string SENTINEL_KEYS_FLAGS = "flags";
+        public const string SENTINEL_KEYS_PENDING_COMMANDS = "pending-commands";
+        public const string SENTINEL_KEYS_LAST_PING_SENT = "last-ping-sent";
+        public const string SENTINEL_KEYS_LAST_OK_PING_REPLY = "last-ok-ping-reply";
+        public const string SENTINEL_KEYS_LAST_PING_REPLY = "last-ping-reply";
+        public const string SENTINEL_KEYS_DOWN_AFTER_MILLISECONDS = "down-after-milliseconds";
+        public const string SENTINEL_KEYS_INFO_REFRESH = "info-refresh";
+        public const string SENTINEL_KEYS_ROLE_REPORTED = "role-reported";
+        public const string SENTINEL_KEYS_ROLE_REPORTED_TIME = "role-reported-time";
 
         public string Name { get; set; }
         public string Host { get; set; }
-        public string Port { get; set; }
+        public int Port { get; set; }
         public string RunId { get; set; }
         public FlagsType Flags { get; set; }
         public int PendingCommands { get; set; }

@@ -45,10 +45,14 @@
   <ItemGroup>
     <Compile Include="Commands.cs" />
     <Compile Include="Exceptions\SentinelConnectionTimeoutException.cs" />
+    <Compile Include="Exceptions\SentinelException.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RedisSentinel.cs" />
     <Compile Include="RespReader.cs" />
+    <Compile Include="SentinelMaster.cs" />
+    <Compile Include="SentinelObjectBase.cs" />
+    <Compile Include="SentinelSlave.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
