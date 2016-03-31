@@ -98,6 +98,13 @@ namespace RedisSentinel
             return masters;
         }
 
+        /// <summary>
+        /// Return master and slaves host. (ip:port)
+        /// Item1 = Masters host
+        /// Item2 = Slaves host
+        /// </summary>
+        /// <param name="masterName"></param>
+        /// <returns></returns>
         public Tuple<IEnumerable<string>, IEnumerable<string>> GetMasterAndSlavesHosts(string masterName = null)
         {
             HashSet<string> master = new HashSet<string>();
