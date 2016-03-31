@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace RedisSentinel
 {
-    public class Commands
+    internal class Commands
     {
         public static string ArrayPrefixSlice = "*";
         public static string BulkStringPrefixSlice = "$";

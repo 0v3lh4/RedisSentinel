@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace RedisSentinel
 {
-    public class RespReader : IDisposable
+    internal class RespReader : IDisposable
     {
         enum RespType : byte
         {

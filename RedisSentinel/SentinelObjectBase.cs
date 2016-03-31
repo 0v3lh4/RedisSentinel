@@ -11,7 +11,17 @@ namespace RedisSentinel
         public enum FlagsType
         {
             master,
-            slave
+            slave,
+            s_down,
+            o_down,
+            sentinel,
+            disconnected,
+            master_down,
+            failover_in_progress,
+            promoted,
+            reconf_sent,
+            reconf_inprog,
+            reconf_done
         }
         public enum RoleReportedType
         {
