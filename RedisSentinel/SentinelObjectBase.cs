@@ -8,21 +8,23 @@ namespace RedisSentinel
 {
     public class SentinelObjectBase
     {
+        [Flags]
         public enum FlagsType
         {
-            master,
-            slave,
-            s_down,
-            o_down,
-            sentinel,
-            disconnected,
-            master_down,
-            failover_in_progress,
-            promoted,
-            reconf_sent,
-            reconf_inprog,
-            reconf_done
+            master = 1 << 0,
+            slave = 1 << 1,
+            s_down = 1 << 2,
+            o_down = 1 << 3,
+            sentinel = 1 << 4,
+            disconnected = 1 << 5,
+            master_down = 1 << 6,
+            failover_in_progress = 1 << 7,
+            promoted = 1 << 8,
+            reconf_sent = 1 << 9,
+            reconf_inprog = 1 << 10,
+            reconf_done = 1 << 11
         }
+
         public enum RoleReportedType
         {
             master,
@@ -45,16 +47,16 @@ namespace RedisSentinel
 
         public string Name { get; set; }
         public string Host { get; set; }
-        public int Port { get; set; }
+        public long Port { get; set; }
         public string RunId { get; set; }
         public FlagsType Flags { get; set; }
-        public int PendingCommands { get; set; }
-        public int LastPingSent { get; set; }
-        public int LastOkPingReply { get; set; }
-        public int LastPingReply { get; set; }
-        public int DownAfterMilliseconds { get; set; }
-        public int InfoRefresh { get; set; }
+        public long PendingCommands { get; set; }
+        public long LastPingSent { get; set; }
+        public long LastOkPingReply { get; set; }
+        public long LastPingReply { get; set; }
+        public long DownAfterMilliseconds { get; set; }
+        public long InfoRefresh { get; set; }
         public RoleReportedType RoleReported { get; set; }
-        public int RoleReportedTime { get; set; }
+        public long RoleReportedTime { get; set; }
     }
 }

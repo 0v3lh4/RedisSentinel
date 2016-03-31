@@ -15,11 +15,11 @@ namespace RedisSentinel
         public const string SENTINEL_KEYS_FAILOVER_TIMEOUT = "failover-timeout";
         public const string SENTINEL_KEYS_PARALLEL_SYNCS = "parallel-syncs";
 
-        public int ConfigEpoch { get; set; }
-        public int SlavesCount { get; set; }
-        public int SentinelsCount { get; set; }
-        public int SentinelQuorum { get; set; }
-        public int FailoverTimeout { get; set; }
-        public int ParallelSyncs { get; set; }
+        public long ConfigEpoch { get; set; }
+        public long SlavesCount { get; set; }
+        public long SentinelsCount { get; set; }
+        public long SentinelQuorum { get; set; }
+        public long FailoverTimeout { get; set; }
+        public long ParallelSyncs { get; set; }
     }
 }

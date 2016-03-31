@@ -21,11 +21,11 @@ namespace RedisSentinel
             err
         }
 
-        public int MasterLinkDowntime { get; set; }
+        public long MasterLinkDowntime { get; set; }
         public MasterLinkStatusType MasterLinkStatus { get; set; }
         public string MasterHost { get; set; }
-        public int MasterPort { get; set; }
-        public int SlavePriority { get; set; }
-        public int SlaveReplOffset { get; set; }
+        public long MasterPort { get; set; }
+        public long SlavePriority { get; set; }
+        public long SlaveReplOffset { get; set; }
     }
 }

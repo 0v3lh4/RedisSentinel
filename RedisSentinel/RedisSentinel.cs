@@ -98,20 +98,32 @@ namespace RedisSentinel
             return masters;
         }
 
-        public Tuple<IEnumerable<string>, IEnumerable<string>> GetMasterAndSlavesHosts(string masterName)
+        public Tuple<IEnumerable<string>, IEnumerable<string>> GetMasterAndSlavesHosts(string masterName = null)
+        {
+            HashSet<string> master = new HashSet<string>();
+            HashSet<string> slaves = new HashSet<string>();
+
+            SetSlaveHosts(masterName, slaves);
+            SetMasterHosts(masterName, master);
+
+            return new Tuple<IEnumerable<string>, IEnumerable<string>>(master, slaves);
+        }
+
+        private void SetMasterHosts(string masterName, HashSet<string> master)
+        {
+            master.Add(GetMasterHostByName(masterName));
+        }
+
+        private void SetSlaveHosts(string masterName, HashSet<string> slaves)
         {
             SendCommand(Commands.Slave(masterName ?? MasterName));
             var responseCommand = (object[])RespReader.Factory.Object(Stream);
-            HashSet<string> master = new HashSet<string>();
-            HashSet<string> slaves = new HashSet<string>();
 
             foreach (var obj in responseCommand)
             {
                 var fields = (object[])obj;
                 string slaveHost = null;
                 string slavePort = null;
-                string masterHost = null;
-                string masterPort = null;
 
                 for (int i = 0; i < fields.Count(); i += 2)
                 {
@@ -126,24 +138,14 @@ namespace RedisSentinel
                         case SentinelObjectBase.SENTINEL_KEYS_PORT:
                             slavePort = value.ToString();
                             break;
-                        case SentinelSlave.SENTINEL_KEYS_MASTER_HOST:
-                            masterHost = value.ToString();
-                            break;
-                        case SentinelSlave.SENTINEL_KEYS_MASTER_PORT:
-                            masterPort = value.ToString();
-                            break;
                     }
 
-                    if (slavePort != null && slaveHost != null
-                        && masterPort != null && masterHost != null)
+                    if (slavePort != null && slaveHost != null)
                         break;
                 }
 
-                master.Add(string.Format("{0}:{1}", masterHost, masterPort));
                 slaves.Add(string.Format("{0}:{1}", slaveHost, slavePort));
             }
-
-            return new Tuple<IEnumerable<string>, IEnumerable<string>>(master, slaves);
         }
 
         public string GetMasterHostByName(string masterName = null)
@@ -171,7 +173,7 @@ namespace RedisSentinel
             switch (key)
             {
                 case SentinelSlave.SENTINEL_KEYS_MASTER_LINK_DOWN_TIME:
-                    slaveObj.MasterLinkDowntime = Convert.ToInt32(value);
+                    slaveObj.MasterLinkDowntime = Convert.ToInt64(value);
                     break;
                 case SentinelSlave.SENTINEL_KEYS_MASTER_LINK_STATUS:
                     slaveObj.MasterLinkStatus = (SentinelSlave.MasterLinkStatusType)Enum.Parse(
@@ -182,13 +184,13 @@ namespace RedisSentinel
                     slaveObj.MasterHost = value.ToString();
                     break;
                 case SentinelSlave.SENTINEL_KEYS_MASTER_PORT:
-                    slaveObj.MasterPort = Convert.ToInt32(value);
+                    slaveObj.MasterPort = Convert.ToInt64(value);
                     break;
                 case SentinelSlave.SENTINEL_KEYS_SLAVE_PRIORITY:
-                    slaveObj.SlavePriority = Convert.ToInt32(value);
+                    slaveObj.SlavePriority = Convert.ToInt64(value);
                     break;
                 case SentinelSlave.SENTINEL_KEYS_SLAVE_REPL_OFFSET:
-                    slaveObj.SlaveReplOffset = Convert.ToInt32(value);
+                    slaveObj.SlaveReplOffset = Convert.ToInt64(value);
                     break;
             }
         }
@@ -201,22 +203,22 @@ namespace RedisSentinel
             switch (key)
             {
                 case SentinelMaster.SENTINEL_KEYS_CONFIG_EPOCH:
-                    masterObj.ConfigEpoch = Convert.ToInt32(value);
+                    masterObj.ConfigEpoch = Convert.ToInt64(value);
                     break;
                 case SentinelMaster.SENTINEL_KEYS_NUM_SLAVES:
-                    masterObj.SlavesCount = Convert.ToInt32(value);
+                    masterObj.SlavesCount = Convert.ToInt64(value);
                     break;
                 case SentinelMaster.SENTINEL_KEYS_NUM_OTHER_SENTINELS:
-                    masterObj.SentinelsCount = Convert.ToInt32(value);
+                    masterObj.SentinelsCount = Convert.ToInt64(value);
                     break;
                 case SentinelMaster.SENTINEL_KEYS_QUORUM:
-                    masterObj.SentinelQuorum = Convert.ToInt32(value);
+                    masterObj.SentinelQuorum = Convert.ToInt64(value);
                     break;
                 case SentinelMaster.SENTINEL_KEYS_FAILOVER_TIMEOUT:
-                    masterObj.FailoverTimeout = Convert.ToInt32(value);
+                    masterObj.FailoverTimeout = Convert.ToInt64(value);
                     break;
                 case SentinelMaster.SENTINEL_KEYS_PARALLEL_SYNCS:
-                    masterObj.ParallelSyncs = Convert.ToInt32(value);
+                    masterObj.ParallelSyncs = Convert.ToInt64(value);
                     break;
             }
         }
@@ -232,30 +234,30 @@ namespace RedisSentinel
                     obj.Host = value.ToString();
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_PORT:
-                    obj.Port = Convert.ToInt32(value);
+                    obj.Port = Convert.ToInt64(value);
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_DOWN_AFTER_MILLISECONDS:
-                    obj.DownAfterMilliseconds = Convert.ToInt32(value);
+                    obj.DownAfterMilliseconds = Convert.ToInt64(value);
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_FLAGS:
                     obj.Flags = (SentinelObjectBase.FlagsType)Enum.Parse(
-                        typeof(SentinelObjectBase.FlagsType),
-                        value.ToString());
+                                    typeof(SentinelObjectBase.FlagsType),
+                                    value.ToString());
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_INFO_REFRESH:
-                    obj.InfoRefresh = Convert.ToInt32(value);
+                    obj.InfoRefresh = Convert.ToInt64(value);
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_LAST_OK_PING_REPLY:
-                    obj.LastOkPingReply = Convert.ToInt32(value);
+                    obj.LastOkPingReply = Convert.ToInt64(value);
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_LAST_PING_REPLY:
-                    obj.LastPingReply = Convert.ToInt32(value);
+                    obj.LastPingReply = Convert.ToInt64(value);
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_LAST_PING_SENT:
-                    obj.LastPingSent = Convert.ToInt32(value);
+                    obj.LastPingSent = Convert.ToInt64(value);
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_PENDING_COMMANDS:
-                    obj.PendingCommands = Convert.ToInt32(value);
+                    obj.PendingCommands = Convert.ToInt64(value);
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_ROLE_REPORTED:
                     obj.RoleReported = (SentinelObjectBase.RoleReportedType)Enum.Parse(
@@ -263,7 +265,7 @@ namespace RedisSentinel
                         value.ToString());
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_ROLE_REPORTED_TIME:
-                    obj.RoleReportedTime = Convert.ToInt32(value);
+                    obj.RoleReportedTime = Convert.ToInt64(value);
                     break;
                 case SentinelObjectBase.SENTINEL_KEYS_RUNID:
                     obj.RunId = value.ToString();
