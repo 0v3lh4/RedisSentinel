@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -18,11 +19,11 @@ namespace RedisSentinel
             Arrays = (byte)'*'
         }
 
-        internal MemoryStream Response { get; set; }
+        internal NetworkStream Stream { get; set; }
 
-        private RespReader(byte[] response)
+        private RespReader(NetworkStream stream)
         {
-            Response = new MemoryStream(response);
+            Stream = stream;
         }
 
         string ReadFirstLine()
@@ -31,7 +32,7 @@ namespace RedisSentinel
 
             int current;
             var prev = default(char);
-            while ((current = Response.ReadByte()) != -1)
+            while ((current = Stream.ReadByte()) != -1)
             {
                 var c = (char)current;
                 if (prev == '\r' && c == '\n')
@@ -58,7 +59,7 @@ namespace RedisSentinel
 
         object FetchResponse()
         {
-            var type = (RespType)Response.ReadByte();
+            var type = (RespType)Stream.ReadByte();
             switch (type)
             {
                 case RespType.SimpleStrings:
@@ -83,7 +84,7 @@ namespace RedisSentinel
                             return null;
                         }
                         var buffer = new byte[length];
-                        Response.Read(buffer, 0, length);
+                        Stream.Read(buffer, 0, length);
 
                         ReadFirstLine();
 
@@ -119,18 +120,19 @@ namespace RedisSentinel
 
         public void Dispose()
         {
-            if (Response != null)
+            if (Stream != null)
             {
-                Response.Close();
-                Response = null;
+                Stream.Dispose();
+                Stream.Close();
+                Stream = null;
             }
         }
 
         public class Factory
         {
-            public static object Return(byte[] response)
+            public static object Object(NetworkStream stream)
             {
-                using (var respreader = new RespReader(response))
+                using (var respreader = new RespReader(stream))
                 {
                     return respreader.FetchResponse();
                 }

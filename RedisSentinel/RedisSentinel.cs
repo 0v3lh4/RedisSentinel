@@ -15,12 +15,11 @@ namespace RedisSentinel
         const string DEFAULT_MASTER_NAME = "mymaster";
         const int DEFAULT_PORT = 26379;
         const int DEFAULT_BUFFER_SIZE = 1024;
-        Socket _socket;
 
+        internal Socket Socket { get; set; }
+        internal NetworkStream Stream { get; set; }
         internal EndPoint[] SentinelsEndpoint { get; private set; }
-
         internal string MasterName { get; private set; }
-
         internal int SockectSendAttemps { get; private set; }
 
         /// <summary>
@@ -48,7 +47,8 @@ namespace RedisSentinel
         public List<SentinelMaster> GetMasters()
         {
             List<SentinelMaster> masters = new List<SentinelMaster>();
-            var responseCommand = RespReader.Factory.Return(SendCommand(Commands.MASTER()));
+            SendCommand(Commands.Master());
+            var responseCommand = RespReader.Factory.Object(Stream);
 
             validResponse(responseCommand);
 
@@ -74,7 +74,8 @@ namespace RedisSentinel
         public List<SentinelSlave> GetSlaves(string masterName = null)
         {
             List<SentinelSlave> masters = new List<SentinelSlave>();
-            var responseCommand = RespReader.Factory.Return(SendCommand(Commands.SLAVE(masterName ?? DEFAULT_MASTER_NAME)));
+            SendCommand(Commands.Slave(masterName ?? MasterName));
+            var responseCommand = RespReader.Factory.Object(Stream);
 
             validResponse(responseCommand);
 
@@ -97,9 +98,67 @@ namespace RedisSentinel
             return masters;
         }
 
+        public Tuple<IEnumerable<string>, IEnumerable<string>> GetMasterAndSlavesHosts(string masterName)
+        {
+            SendCommand(Commands.Slave(masterName ?? MasterName));
+            var responseCommand = (object[])RespReader.Factory.Object(Stream);
+            HashSet<string> master = new HashSet<string>();
+            HashSet<string> slaves = new HashSet<string>();
+
+            foreach (var obj in responseCommand)
+            {
+                var fields = (object[])obj;
+                string slaveHost = null;
+                string slavePort = null;
+                string masterHost = null;
+                string masterPort = null;
+
+                for (int i = 0; i < fields.Count(); i += 2)
+                {
+                    var key = fields[i].ToString();
+                    var value = fields[i + 1];
+
+                    switch (key)
+                    {
+                        case SentinelObjectBase.SENTINEL_KEYS_IP:
+                            slaveHost = value.ToString();
+                            break;
+                        case SentinelObjectBase.SENTINEL_KEYS_PORT:
+                            slavePort = value.ToString();
+                            break;
+                        case SentinelSlave.SENTINEL_KEYS_MASTER_HOST:
+                            masterHost = value.ToString();
+                            break;
+                        case SentinelSlave.SENTINEL_KEYS_MASTER_PORT:
+                            masterPort = value.ToString();
+                            break;
+                    }
+
+                    if (slavePort != null && slaveHost != null
+                        && masterPort != null && masterHost != null)
+                        break;
+                }
+
+                master.Add(string.Format("{0}:{1}", masterHost, masterPort));
+                slaves.Add(string.Format("{0}:{1}", slaveHost, slavePort));
+            }
+
+            return new Tuple<IEnumerable<string>, IEnumerable<string>>(master, slaves);
+        }
+
+        public string GetMasterHostByName(string masterName = null)
+        {
+            SendCommand(Commands.MasterAddrByName(masterName ?? MasterName));
+            var responseCommand = (object[])RespReader.Factory.Object(Stream);
+
+            validResponse(responseCommand);
+
+            return string.Format("{0}:{1}", responseCommand[0], responseCommand[1]);
+        }
+
         private void validResponse(object responseCommand)
         {
-            if(responseCommand is string && responseCommand.ToString().Contains("ERR"))
+            if (responseCommand is string && responseCommand.ToString().Contains("ERR"))
             {
                 throw new SentinelException(responseCommand.ToString().Replace("ERR", ""));
             }
@@ -131,7 +190,7 @@ namespace RedisSentinel
                 case SentinelSlave.SENTINEL_KEYS_SLAVE_REPL_OFFSET:
                     slaveObj.SlaveReplOffset = Convert.ToInt32(value);
                     break;
-           }
+            }
         }
 
 
@@ -212,53 +271,29 @@ namespace RedisSentinel
             }
         }
 
-        internal byte[] SendCommand(byte[] command)
+        internal void SendCommand(byte[] command)
         {
             Start();
 
-            var receivedData = new byte[DEFAULT_BUFFER_SIZE];
-            int bytesRead = 0;
-            int bytesReadAux = 0;
-            byte[] bytes = null;
-
-            if (_socket.Connected)
+            try
             {
-                try
+                Socket.Send(command, command.Length, SocketFlags.None);
+                Stream = new NetworkStream(Socket);
+            }
+            catch (SocketException ex)
+            {
+                if (SockectSendAttemps < SentinelSendAttemps)
                 {
-                    _socket.Send(command, command.Length, SocketFlags.None);
+                    Dispose();
 
-                    while (_socket.Available > 0)
-                    {
-                        bytesRead = _socket.Receive(receivedData, receivedData.Length, SocketFlags.None);
-
-                        if (bytes == null)
-                        {
-                            bytes = new byte[_socket.Available + bytesRead];
-                        }
-
-                        Buffer.BlockCopy(receivedData, 0, bytes, bytesReadAux, bytesRead);
-
-                        bytesReadAux += bytesRead;
-                    }
+                    SockectSendAttemps++;
+                    SendCommand(command);
                 }
-                catch (SocketException ex)
+                else
                 {
-                    if (SockectSendAttemps < SentinelSendAttemps)
-                    {
-                        Dispose();
-
-                        SockectSendAttemps++;
-                        return SendCommand(command);
-                    } else
-                    {
-                        throw new SentinelException(ex.Message, ex);
-                    }
+                    throw new SentinelException(ex.Message, ex);
                 }
             }
-
-            Dispose();
-
-            return bytes;
         }
 
         private EndPoint CreateEndPoint(string host, int port)
@@ -302,6 +337,9 @@ namespace RedisSentinel
 
         private void Start()
         {
+            if (IsSocketConnected())
+                return;
+
             for (int i = 0; i < SentinelsEndpoint.Count(); i++)
             {
                 var endpoint = SentinelsEndpoint[i];
@@ -317,18 +355,24 @@ namespace RedisSentinel
                 }
             }
 
-            if (_socket == null)
+            if (Socket == null)
                 throw new SentinelConnectionTimeoutException("All setinels are down");
+        }
+
+        private bool IsSocketConnected()
+        {
+            return Socket != null && Socket.Connected;
         }
 
         private void Connect(EndPoint sentinelEndPoint)
         {
-            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            if (Socket == null)
+                Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
-            var asyncResult = _socket.BeginConnect(sentinelEndPoint, null, null);
+            var asyncResult = Socket.BeginConnect(sentinelEndPoint, null, null);
             var success = asyncResult.AsyncWaitHandle.WaitOne(SentinelConnectTimeoutMs, true);
 
-            if (!success || !_socket.Connected)
+            if (!success || !Socket.Connected)
             {
                 Dispose();
                 asyncResult = null;
@@ -338,10 +382,26 @@ namespace RedisSentinel
 
         public void Dispose()
         {
-            if (_socket != null && _socket.Connected)
-                _socket.Close();
+            if (Stream != null)
+            {
+                Stream.Close();
+                Stream.Dispose();
+            }
 
-            _socket = null;
+            if (IsSocketConnected())
+            {
+                Socket.Shutdown(SocketShutdown.Both);
+                Socket.Close();
+                Socket.Dispose();
+            }
+
+            Socket = null;
+            Stream = null;
+        }
+
+        public void Close()
+        {
+            Dispose();
         }
     }
 }

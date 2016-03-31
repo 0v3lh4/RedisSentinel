@@ -12,13 +12,19 @@ namespace RedisSentinel
         public static string BulkStringPrefixSlice = "$";
         public static string LineEndPrefixSlice = "\r\n";
 
-        public static byte[] MASTER()
+        public static byte[] Master()
         {
             return GenerateCommand("SENTINEL", "MASTERS");
         }
-        public static byte[] SLAVE(string masterName)
+
+        public static byte[] Slave(string masterName)
         {
             return GenerateCommand("SENTINEL", "SLAVES", masterName);
+        }
+
+        public static byte[] MasterAddrByName(string masterName)
+        {
+            return GenerateCommand("SENTINEL", "GET-MASTER-ADDR-BY-NAME", masterName);
         }
 
         private static byte[] GenerateCommand(params string[] commands)
